@@ -2,7 +2,7 @@
 %
 %% File: l3keys.dtx
 %
-% Copyright (C) 2006-2024 The LaTeX Project
+% Copyright (C) 2006-2025 The LaTeX Project
 %
 % It may be distributed and/or modified under the conditions of the
 % LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -43,7 +43,7 @@
 %    }^^A
 % }
 %
-% \date{Released 2024-12-25}
+% \date{Released 2025-01-18}
 %
 % \maketitle
 %
@@ -1811,24 +1811,33 @@
 % \subsection{The key defining mechanism}
 %
 % \begin{macro}{\keys_define:nn, \keys_define:ne, \keys_define:nx}
-% \begin{macro}{\@@_define:nnn, \@@_define:onn}
 %   The public function for definitions is just a wrapper for the lower
 %   level mechanism, more or less. The outer function is designed to
 %   keep a track of the current module, to allow safe nesting. The module is set
 %   removing any leading |/| (which is not needed here).
 %    \begin{macrocode}
-\cs_new_protected:Npn \keys_define:nn
-  { \@@_define:onn \l_@@_module_str }
-\cs_generate_variant:Nn \keys_define:nn { ne , nx }
-\cs_new_protected:Npn \@@_define:nnn #1#2#3
+\cs_new_protected:Npn \keys_define:nn #1#2
   {
-    \str_set:Ne \l_@@_module_str { \@@_trim_spaces:n {#2} }
-    \keyval_parse:NNn \@@_define:n \@@_define:nn {#3}
-    \str_set:Nn \l_@@_module_str {#1}
+    \use:e
+      {
+        \exp_not:n
+          {
+            \str_set:Ne \l_@@_module_str { \@@_trim_spaces:n {#1} }
+            \keyval_parse:NNn \@@_define:n \@@_define:nn {#2}
+          }
+        \@@_reset_var:N \l_@@_module_str
+        \@@_reset_var:N \l_@@_inherit_str
+        \@@_reset_var:N \l_keys_choice_tl
+        \@@_reset_var:N \l_keys_key_tl
+        \@@_reset_var:N \l_keys_key_str
+        \@@_reset_var:N \l_keys_path_tl
+        \@@_reset_var:N \l_keys_path_str
+        \@@_reset_var:N \l_keys_value_tl
+        \int_set:Nn \l_keys_choice_int { \int_use:N \l_keys_choice_int }
+      }
   }
-\cs_generate_variant:Nn \@@_define:nnn { o }
+\cs_generate_variant:Nn \keys_define:nn { ne , nx }
 %    \end{macrocode}
-% \end{macro}
 % \end{macro}
 %
 % \begin{macro}{\@@_define:n}
@@ -2249,14 +2258,8 @@
 %   function is used here as a meta key should respect the prevailing
 %   filtering, etc.
 %    \begin{macrocode}
-\cs_new_protected:Npn \@@_meta_make:n #1
-  {
-    \exp_args:NVo \@@_cmd_set_direct:nn \l_keys_path_str
-      {
-        \exp_after:wN \@@_set:nn \exp_after:wN 
-          { \l_@@_module_str } {#1}
-      }
-  }
+\cs_new_protected:Npn \@@_meta_make:n
+  { \exp_args:NV \@@_meta_make:nn \l_@@_module_str }
 \cs_new_protected:Npn \@@_meta_make:nn #1#2
   {
     \exp_args:NV \@@_cmd_set_direct:nn
@@ -2362,6 +2365,7 @@
 % \begin{macro}{\@@_usage:n}
 % \begin{macro}{\@@_usage:NN}
 % \begin{macro}{\@@_usage:w}
+% \begin{macro}{\@@_usage_aux:w}
 %   Save the relevant data.
 %    \begin{macrocode}
 \cs_new_protected:Npn \@@_usage:n #1
@@ -2402,15 +2406,26 @@
     \prop_get:NVNF #1 \l_@@_module_str \l_@@_tmpa_tl
       { \tl_clear:N \l_@@_tmpa_tl }
     \tl_set:Ne \l_@@_tmpb_tl
-      { \exp_after:wN \@@_usage:w \l_keys_path_str \s_@@_stop }
+      {
+        \exp_after:wN \exp_after:wN \exp_after:wN \@@_usage:w \exp_after:wN 
+          \l_keys_path_str \exp_after:wN / \exp_after:wN \s_@@_stop
+          \exp_after:wN { \l_keys_path_str }
+      }
     \bool_if:NTF #2
       { \clist_put_right:NV \l_@@_tmpa_tl \l_@@_tmpb_tl }
       { \clist_remove_all:NV \l_@@_tmpa_tl \l_@@_tmpb_tl }
     \prop_put:NVV #1 \l_@@_module_str
       \l_@@_tmpa_tl
   }
-\cs_new:Npn \@@_usage:w #1 / #2 \s_@@_stop {#2}
+\cs_new:Npn \@@_usage:w #1 / #2 \s_@@_stop #3
+  {
+    \tl_if_blank:nTF {#2}
+     {#1}
+     { \@@_usage_aux:w #3 \s_@@_stop }
+  }
+\cs_new:Npn \@@_usage_aux:w #1 / #2 \s_@@_stop {#2}
 %    \end{macrocode}
+% \end{macro}
 % \end{macro}
 % \end{macro}
 % \end{macro}
@@ -2841,7 +2856,6 @@
 % \subsection{Setting keys}
 %
 % \begin{macro}{\@@_set:nnnnNn}
-% \begin{macro}{\@@_set:nnnnnnnNn}
 % \begin{macro}[EXP]{\@@_reset_bool:N, \@@_reset_var:N}
 % \begin{macro}{\@@_set:nn}
 % \begin{macro}{\@@_set:nnn}
@@ -2858,39 +2872,46 @@
 %    \item The code to set up the correct selection approach
 %  \end{enumerate}
 %    \begin{macrocode}
-\cs_new_protected:Npn \@@_set:nnnnNn
+\cs_new_protected:Npn \@@_set:nnnnNn #1#2#3#4#5#6
   {
-    \exp_args:Nooo \@@_set:nnnnnnnNn
-      \l_@@_unused_clist
-      \l_@@_selective_clist
-      \l_@@_relative_tl
-  }
-\cs_new_protected:Npn \@@_set:nnnnnnnNn #1#2#3#4#5#6#7#8#9
-  {
-    \clist_clear:N \l_@@_unused_clist
-    \clist_set:Ne \l_@@_selective_clist { \tl_to_str:n {#5} }
-    \tl_set:Nn \l_@@_relative_tl {#7}
     \use:e
       {
         \exp_not:n
           {
-            #9
-            \@@_set:nn {#4} {#6}
+            \clist_clear:N \l_@@_unused_clist
+            \clist_set:Ne \l_@@_selective_clist { \tl_to_str:n {#2} }
+            \tl_set:Nn \l_@@_relative_tl {#4}
+            #6
+            \@@_set:nn {#1} {#3}
+            \clist_set_eq:NN #5 \l_@@_unused_clist
           }
         \@@_reset_bool:N \l_@@_only_known_bool
         \@@_reset_bool:N \l_@@_exclude_bool
         \@@_reset_bool:N \l_@@_selective_bool
+        \@@_reset_var:N \l_@@_unused_clist
+        \@@_reset_var:N \l_@@_selective_clist
+        \@@_reset_var:N \l_@@_relative_tl
+        \@@_reset_var:N \l_@@_inherit_str
+        \@@_reset_var:N \l_keys_choice_tl
+        \@@_reset_var:N \l_keys_key_tl
+        \@@_reset_var:N \l_keys_key_str
+        \@@_reset_var:N \l_keys_path_tl
+        \@@_reset_var:N \l_keys_path_str
+        \@@_reset_var:N \l_keys_value_tl
+        \int_set:Nn \l_keys_choice_int { \int_use:N \l_keys_choice_int }
       }
-    \clist_set_eq:NN #8 \l_@@_unused_clist
-    \__kernel_tl_set:Nx \l_@@_unused_clist { \exp_not:n {#1} }
-    \__kernel_tl_set:Nx \l_@@_selective_clist {#2}
-    \__kernel_tl_set:Nx \l_@@_relative_tl { \exp_not:n {#3} }
   }
 \cs_new:Npn \@@_reset_bool:N #1
   {
     \exp_not:c
       { bool_set_ \bool_if:NTF #1 { true } { false } :N }
         \exp_not:N #1
+  }
+\cs_new:Npn \@@_reset_var:N #1
+  {
+    \exp_not:n
+      { \__kernel_tl_set:Nx #1 }
+        { \exp_not:N \exp_not:n { \exp_not:o { #1 } } }
   }
 \cs_new_protected:Npn \@@_set:nn #1#2
   { \exp_args:No \@@_set:nnn \l_@@_module_str {#1} {#2} }
@@ -2901,7 +2922,6 @@
     \str_set:Nn \l_@@_module_str {#1}
   }
 %    \end{macrocode}
-% \end{macro}
 % \end{macro}
 % \end{macro}
 % \end{macro}
@@ -3531,35 +3551,59 @@
 % \end{macro}
 %
 % \begin{macro}[EXP,pTF]{\keys_if_exist:nn}
+% \begin{macro}[EXP]{\@@_if_exist:nn, \@@_if_exist:ee}
 %   A utility for others to see if a key exists.
 %    \begin{macrocode}
 \prg_new_conditional:Npnn \keys_if_exist:nn #1#2 { p , T , F , TF }
   {
+    \@@_if_exist:ee
+      { \@@_trim_spaces:n {#1} }
+      { \@@_trim_spaces:n {#2} }
+  }
+\prg_generate_conditional_variant:Nnn \keys_if_exist:nn { ne } { p , T , F , TF }
+\cs_new:Npn \@@_if_exist:nn #1#2
+  {
     \cs_if_exist:cTF
-      { \c_@@_code_root_str \@@_trim_spaces:n { #1 / #2 } }
+      { \c_@@_code_root_str #1 \tl_if_blank:nF {#1} { / } #2 }
       { \prg_return_true: }
       { \prg_return_false: }
   }
-\prg_generate_conditional_variant:Nnn \keys_if_exist:nn { ne } { p , T , F , TF }
+\cs_generate_variant:Nn \@@_if_exist:nn { ee }
 %    \end{macrocode}
+% \end{macro}
 % \end{macro}
 %
 % \begin{macro}[EXP,pTF]{\keys_if_choice_exist:nnn}
+% \begin{macro}[EXP]{\@@_if_exist:nnn, \@@_if_exist:eee}
 %   Just an alternative view on \cs{keys_if_exist:nnTF}.
 %    \begin{macrocode}
 \prg_new_conditional:Npnn \keys_if_choice_exist:nnn #1#2#3
   { p , T , F , TF }
   {
+    \@@_if_exist:eee
+      { \@@_trim_spaces:n {#1} }
+      { \@@_trim_spaces:n {#2} }
+      { \@@_trim_spaces:n {#3} }
+  }
+\cs_new:Npn \@@_if_exist:nnn #1#2#3
+  {
     \cs_if_exist:cTF
-      { \c_@@_code_root_str \@@_trim_spaces:n { #1 / #2 / #3 } }
+      {
+        \c_@@_code_root_str
+          #1 \tl_if_blank:nF {#1} { / }
+          #2 \tl_if_blank:nF {#2} { / }
+          #3
+      }
       { \prg_return_true: }
       { \prg_return_false: }
   }
+\cs_generate_variant:Nn \@@_if_exist:nnn { eee }
 %    \end{macrocode}
+% \end{macro}
 % \end{macro}
 %
 % \begin{macro}{\keys_show:nn, \keys_log:nn}
-% \begin{macro}{\@@_show:Nnn}
+% \begin{macro}{\@@_show:Nnn, \@@_show_aux:Nnn, , \@@_show_aux:Nee}
 % \begin{macro}{\@@_show:n}
 % \begin{macro}{\@@_show:w}
 % \begin{macro}{\@@_show:Nw}
@@ -3571,8 +3615,15 @@
   { \@@_show:Nnn \msg_log:nneeee }
 \cs_new_protected:Npn \@@_show:Nnn #1#2#3
   {
+    \@@_show_aux:Nee
+      #1
+      { \@@_trim_spaces:n {#2} }
+      { \@@_trim_spaces:n {#3} }
+  }
+\cs_new_protected:Npn \@@_show_aux:Nnn #1#2#3
+  {
     #1 { keys } { show-key }
-      { \@@_trim_spaces:n { #2 / #3 } }
+      { #2 \tl_if_blank:nF {#2} { / } #3 }
       {
         \keys_if_exist:nnT {#2} {#3}
           {
@@ -3583,7 +3634,7 @@
                     \exp_args:Nc \cs_replacement_spec:N
                     {
                       \c_@@_code_root_str
-                      \@@_trim_spaces:n { #2 / #3 }
+                      #2 \tl_if_blank:nF {#2} { / } #3
                     }
                   }
               }
@@ -3591,6 +3642,7 @@
       }
       { } { }
   }
+\cs_generate_variant:Nn \@@_show_aux:Nnn { Nee }
 \cs_new:Npe \@@_show:n #1
   {
     \exp_not:N \@@_show:w

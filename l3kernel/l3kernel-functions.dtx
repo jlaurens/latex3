@@ -2,7 +2,7 @@
 %
 %% File: l3kernel-functions.dtx
 %
-% Copyright (C) 2018-2024 The LaTeX Project
+% Copyright (C) 2018-2025 The LaTeX Project
 %
 % It may be distributed and/or modified under the conditions of the
 % LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -43,7 +43,7 @@
 %    }^^A
 % }
 %
-% \date{Released 2024-12-25}
+% \date{Released 2025-01-18}
 %
 % \maketitle
 %
@@ -175,6 +175,22 @@
 %   one or more of the groups may be empty: the bytes read in the logical order,
 %   such that a two-byte codepoint will have groups |#1| and |#2| filled
 %   and |#3| and |#4| empty.
+% \end{function}
+%
+% \begin{function}[EXP]
+%   {
+%     \__kernel_codepoint_to_grapheme_class:n,
+%     \__kernel_codepoint_to_wordbreak_class:n
+%   }
+%   \begin{syntax}
+%     \cs{__kernel_codepoint_to_grapheme_class:n} \Arg{codepoint}
+%     \cs{__kernel_codepoint_to_wordbreak_class:n} \Arg{codepoint}
+%   \end{syntax}
+%   Expands to the Unicode properties |Grapheme_Cluster_Break| and
+%   |Word_Break|, respectively, of the \meta{codepoint}. Here,
+%   |Grapheme_Cluster_Break| and |Word_Break| are strings matching
+%   exactly the descriptors given in
+%   \url{https://www.unicode.org/reports/tr29/}.
 % \end{function}
 %
 % \begin{function}{\__kernel_cs_parm_from_arg_count:nnF}

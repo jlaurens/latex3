@@ -7,7 +7,42 @@ this project uses date-based 'snapshot' version identifiers.
 
 ## [Unreleased]
 
+### Added
+- `\text_words_map_function:nN`
+- Variants `\tl_head:e` and `\tl_tail:e`
+- `l3tl` functions (and variants) which trim spaces from only one side
+  (issue \#1673):
+  - `\tl_trim_left_spaces:n`, `\tl_trim_left_spaces_apply:nN`,
+    `\tl_(g)trim_left_spaces:N`
+  - `\tl_trim_right_spaces:n`, `\tl_trim_right_spaces_apply:nN`,
+    `\tl_(g)trim_right_spaces:N`
+
+### Fixed
+- Avoid low-level error if keys are given without a module (issue \#1254)
+
+## [2025-01-18]
+
+### Changed
+- Use a dedicated internal marker for `fp` and `int` expressions, allowing use
+  with LuaMetaTeX (see \#1518)
+
+### Fixed
+- Missing trailing period in `\tl_analysis_log:(N|n)` output (see \#1663)
+- Some state variables weren't correctly reset by `\keys_define:nn` and
+    `\keys_set:nn` breaking some nested usages in edge cases
+
+## [2025-01-14]
+
+### Added
+- `\int_step_tokens:nn`, `\int_step_tokens:nnn`, and `\int_step_tokens:nnnn`
+
+### Fixed
+- Check conditionals are defined when creating variants (see \#1189)
+
 ## [2024-12-25]
+
+### Added
+- `\file_forget:n`
 
 ### Changed
 - Expand 'value(s)' arg. to `\color_select:nn`, `\color_set:nnn`, etc. (see
@@ -15,9 +50,6 @@ this project uses date-based 'snapshot' version identifiers.
 
 ### Fixed
 - Initialize color `.` properly (see \#1642)
-
-### Added
-- `\file_forget:n`
 
 ## [2024-12-09]
 
@@ -60,11 +92,11 @@ this project uses date-based 'snapshot' version identifiers.
 
 ## [2024-09-10]
 
-### Fixed
-- `\seq_map_pairwise_function:NNN` not work with `\seq_map_break:(n)` (issue \#1587)
-
 ### Changed
 - Increase outdent of long function names in `l3doc` (issue \#1585)
+
+### Fixed
+- `\seq_map_pairwise_function:NNN` not work with `\seq_map_break:(n)` (issue \#1587)
 
 ## [2024-08-30]
 
@@ -311,10 +343,10 @@ this project uses date-based 'snapshot' version identifiers.
 - Switch generally from `x`- to `e`-type variants
 - Convert `\file_if_exist:n(TF)` to expandable status,
   adding predicate version
-- Standardise variants for `\prop_(g)pop:NnN(TF)`
-- Standardise variants for `\prop_(g)put:Nnn`
-- Standardise variants for `\prop_(g)put_if_new:Nnn`
-- Standardise variants for `\prop_(g)remove:Nn`
+- Standardize variants for `\prop_(g)pop:NnN(TF)`
+- Standardize variants for `\prop_(g)put:Nnn`
+- Standardize variants for `\prop_(g)put_if_new:Nnn`
+- Standardize variants for `\prop_(g)remove:Nn`
 
 ### Deprecated
 - `\iow_shipout_x:Nn` in favor of `e`-type naming
@@ -409,6 +441,7 @@ this project uses date-based 'snapshot' version identifiers.
 - `\file_input_raw:n`
 - `\int_if_zero:n(TF)`
 - `\str_mdfive_hash:n`
+
 ### Changed
 - Remove `\noexpand` inside math mode in `\text_expand:n`
 - Re-implement `\dim_to_decimal_in_bp:n` and 
@@ -561,13 +594,13 @@ this project uses date-based 'snapshot' version identifiers.
 ### Added
 - Complete list of pdfTeX primitives
 
+### Changed
+- Leave catcode of `&` unchanged in code environment
+
 ### Fixed
 - Allow for multi-part BCP47 strings in case changing
 - Loading with plain TeX due to `\outer` status of `^^L`
   issue ([\#1161](https://github.com/latex3/latex3/issues/1161))
-
-### Changed
-- Leave catcode of `&` unchanged in code environment
 
 ## [2023-01-16]
 
@@ -658,9 +691,8 @@ this project uses date-based 'snapshot' version identifiers.
 
 ### Changed
 - Replace `LaTeX3` in message text by `LaTeX`
-
-### Changed
 - Approach to setting current color data from LaTeX2e
+
 ## [2022-08-05]
 
 ### Added
@@ -1827,7 +1859,9 @@ this project uses date-based 'snapshot' version identifiers.
 - Step functions have been added for dim variables,
   e.g. `\dim_step_inline:nnnn`
 
-[Unreleased]: https://github.com/latex3/latex3/compare/2024-12-25...HEAD
+[Unreleased]: https://github.com/latex3/latex3/compare/2025-01-18...HEAD
+[2025-01-18]: https://github.com/latex3/latex3/compare/2025-01-14...2025-01-18
+[2025-01-14]: https://github.com/latex3/latex3/compare/2024-12-25...2025-01-14
 [2024-12-25]: https://github.com/latex3/latex3/compare/2024-12-09...2024-12-25
 [2024-12-09]: https://github.com/latex3/latex3/compare/2024-11-02...2024-12-09
 [2024-11-02]: https://github.com/latex3/latex3/compare/2024-10-09...2024-11-02

@@ -2,7 +2,7 @@
 %
 %% File: l3unicode.dtx
 %
-% Copyright (C) 2018-2024 The LaTeX Project
+% Copyright (C) 2018-2025 The LaTeX Project
 %
 % It may be distributed and/or modified under the conditions of the
 % LaTeX Project Public License (LPPL), either version 1.3c of this
@@ -43,7 +43,7 @@
 %    }^^A
 % }
 %
-% \date{Released 2024-12-25}
+% \date{Released 2025-01-18}
 %
 % \maketitle
 %
@@ -485,38 +485,42 @@
 %
 % Notice that in the standard \pkg{expl3} way we are indexes position not
 % offset: that does mean a little work later.
+%
+% For integer values, everything is done using token lists to avoid loosing
+% registers or making global names.
 %    \begin{macrocode}
 \group_begin:
   \clist_map_inline:nn
-    { category , uppercase , lowercase }
+    { category , grapheme , lowercase , uppercase , wordbreak }
     {
       \cs_set_nopar:cpn { l_@@_ #1 _block_clist } { }
       \cs_set_nopar:cpn { l_@@_ #1 _block_tl } { 1 }
       \cs_set_nopar:cpn { l_@@_ #1 _pos_tl } { 0 }
+      \cs_set_nopar:cpn { l_@@_ #1 _next_tl } { 0 }
       \intarray_new:cn { g_@@_ #1 _index_intarray }
         { \int_div_truncate:nn { "110000 } \c_@@_block_size_int }
     }
 %    \end{macrocode}
-%  We need an integer value when matching the current block to those we have
-%  already seen, and a way to track codepoints for handling ranges. Again,
-%  we avoid using up registers or creating global names.
+% We also need to track the matched block: this is used dynamically so we
+% only require one variable.
 %    \begin{macrocode}
-  \cs_set_nopar:Npn \l_@@_next_codepoint_fint_tl { 0 }
   \cs_set_nopar:Npn \l_@@_matched_block_tl { 0 }
 %    \end{macrocode}
-% For Unicode general category, there needs to be numerical representation of
-% each possible value. As we need to go from string to number here, but the
-% other way elsewhere, we set up fast mappings both ways, but one set local
-% and the other as constants.
+% For Unicode general category and the various breaking properies, there needs
+% to be numerical representation of each possible value. As we need to go from
+% string to number here, but the other way elsewhere, we set up fast mappings
+% both ways, but one set local and the other as constants.
 %    \begin{macrocode}
-  \cs_set_protected:Npn \@@_data_auxi:w #1#2
+  \cs_set_nopar:Npn \l_@@_uppercase_default_tl { 0 }
+  \cs_set_nopar:Npn \l_@@_lowercase_default_tl { 0 }
+  \cs_set_protected:Npn \@@_data_auxi:w #1#2#3
     {
-      \quark_if_recursion_tail_stop:n {#2}
-      \cs_set_nopar:cpn { l_@@_category_ #2 _tl } {#1}
-      \str_const:cn { c_@@_category_ \tex_romannumeral:D #1 _str } {#2}
-      \exp_args:Ne \@@_data_auxi:w { \int_eval:n { #1 + 1 } }
+      \quark_if_recursion_tail_stop:n {#3}
+      \cs_set_nopar:cpn { l_@@_ #2 _ #3 _tl } {#1}
+      \str_const:cn { c_@@_ #2 _ \tex_romannumeral:D #1 _str } {#3}
+      \exp_args:Ne \@@_data_auxi:w { \int_eval:n { #1 + 1 } } {#2}
     }
-  \@@_data_auxi:w { 1 }
+  \@@_data_auxi:w { 1 } { category }
     { Lu } { Ll } { Lt } { Lm } { Lo }
     { Mn } { Me } { Mc }
     { Nd } { Nl } { No }
@@ -526,6 +530,87 @@
     { Sm } { Sc } { Sk } { So }
     \q_recursion_tail
     \q_recursion_stop
+  \cs_set_eq:NN \l_@@_category_default_tl \l_@@_category_Cn_tl
+  \@@_data_auxi:w { 1 } { grapheme }
+    { Control }
+    { CR } { LF } { ZWJ }
+    { Extend }
+    { L } { LV } { LVT } { T } { V }
+    { Prepend }
+    { Regional_Indicator }
+    { SpacingMark }
+    { Other }
+    \q_recursion_tail
+    \q_recursion_stop
+  \cs_set_eq:NN \l_@@_grapheme_default_tl \l_@@_grapheme_Other_tl
+  \@@_data_auxi:w { 1 } { wordbreak }
+    { Double_Quote } { Single_Quote }
+    { CR } { LF } { Newline }
+    { WSegSpace } { ZWJ }
+    { Extend } { ExtendNumLet }
+    { Regional_Indicator }
+    { Format }
+    { Katakana }
+    { ALetter } { MidLetter } { Hebrew_Letter }
+    { Numeric }{ MidNum } { MidNumLet }
+    { Other }
+    \q_recursion_tail
+    \q_recursion_stop
+  \cs_set_eq:NN \l_@@_wordbreak_default_tl \l_@@_wordbreak_Other_tl
+%    \end{macrocode}
+%  For the the property fiels, we need to use a two-step procedure
+%  as the file is ordered by class not codepoint. First, we parse the content
+%  into the hash table locally: there are around $1400$ codepoints to handle,
+%  which is workable. Reading this is quite easy: we store any end-of-range
+%  codepoint and the class that applies. Conversion to a two-stage table
+%  is deferred to later.
+%    \begin{macrocode}
+  \cs_set_protected:Npn \@@_data_auxi:w #1 ;~ #2 ~ #3 \q_stop
+    { \@@_data_auxii:w #1 .. \q_stop {#2} }
+  \cs_set_protected:Npn \@@_data_auxii:w #1 .. #2 \q_stop
+    { \@@_data_auxiii:w #1 ~ .. #2 ~ \q_stop }
+  \cs_set_protected:Npn \@@_data_auxiii:w #1 ~ #2 .. #3 ~ #4 \q_stop #5#6
+    {
+      \cs_set_nopar:cpe { l_@@_ #6 _ \tex_romannumeral:D "#1 _tl }
+        {
+          {#3}
+          { \use:c { l_@@_ #6 _ #5 _tl } }
+        }
+    }
+  \cs_set_protected:Npn \@@_data_auxvi:w #1#2
+    {
+      \ior_open:Nn \g_@@_data_ior {#1}
+      \ior_str_map_inline:Nn \g_@@_data_ior
+        {
+          \str_if_eq:eeF { \tl_head:w ##1 \c_hash_str \q_stop } { \c_hash_str }
+            {
+              \tl_if_blank:nF {##1}
+                { \@@_data_auxi:w ##1 \q_stop {#2} }
+            }
+        }
+      \ior_close:N \g_@@_data_ior
+    }
+  \@@_data_auxvi:w { GraphemeBreakProperty.txt } { grapheme }
+  \@@_data_auxvi:w { WordBreakProperty.txt } { wordbreak }
+%    \end{macrocode}
+%  The set up for adding property data is now sorted.
+%    \begin{macrocode}
+  \cs_set_protected:Npn \@@_data_property:nnnn #1#2#3#4
+    {
+      \int_compare:nNnT {#3} > { \use:c { l_@@_ #4 _next_tl } }
+        {
+          \@@_range:nnv {#3} {#4}
+            { l_@@_ #4 _default_tl }
+        }
+      \@@_add:nn {#4} {#2}
+      \tl_set:ce { l_@@_ #4 _next_tl } { \int_eval:n { #3 + 1 } }
+      \tl_if_blank:nF {#1}
+        {
+          \@@_range:nnn {"#1} {#4} {#2}
+          \@@_add:nn {#4} {#2}
+          \tl_set:ce { l_@@_ #4 _next_tl } { \int_eval:n { "#1 + 1 } }
+        }
+    }
 %    \end{macrocode}
 % Parse the main Unicode data file and pull out the NFD and case changing
 % data. The NFD data is stored on using the hash table approach and can yield
@@ -593,7 +678,7 @@
 %    \begin{macrocode}
   \cs_set_protected:Npn \@@_data_auxiv:w #1 ; #2 ; #3 ; #4 ; #5 ; #6 ;
     {
-      \int_compare:nNnT {"#1} > \l_@@_next_codepoint_fint_tl
+      \int_compare:nNnT {"#1} > \l_@@_category_next_tl
         {
           \@@_data_auxv:nnnnw {#1} {#3} {#4} {#5}
             #2 Last> \q_stop
@@ -607,8 +692,26 @@
             { c_@@_titlecase_ \codepoint_str_generate:n {"#1} _tl }
             { {"#6} { } { } }
         }
-      \tl_set:Ne \l_@@_next_codepoint_fint_tl
+      \@@_data_auxvi:nn { grapheme } {"#1}
+      \@@_data_auxvi:nn { wordbreak } {"#1}
+%    \end{macrocode}
+% To deal with the property data, we need to recover stored information and
+% build the table. Generally we can assume that all codepoints in these
+% files are in |UnicodeData.txt|, but there is one place
+% a bit more work is needed. For Hangul syllables, the main file lists a range
+% but within that we have different classifications for breaking: that needs to
+% be handled with a second loop. The values for this range are hard-coded,
+% skipping the end-of-range as that will be mopped up by the main loop.
+%    \begin{macrocode}
+      \int_compare:nNnT {"#1} = { "AC00 }
+        {
+          \int_step_inline:nnn { "AC01 } { "D7A2 }
+            { \@@_data_auxvi:nn { grapheme } {##1} }
+        }
+      \tl_set:Ne \l_@@_category_next_tl
         { \int_eval:n { "#1 + 1 } }
+      \tl_set_eq:NN \l_@@_lowercase_next_tl \l_@@_category_next_tl
+      \tl_set_eq:NN \l_@@_uppercase_next_tl \l_@@_category_next_tl
     }
   \cs_set_protected:Npn \@@_add:nn #1#2
     {
@@ -622,30 +725,47 @@
 %  The general category for unassigned characters is \texttt{Cn}, so we
 %  find the correct value once and then use that.
 %    \begin{macrocode}
-  \cs_set_protected:Npe \@@_data_auxv:nnnnw #1#2#3#4#5 Last> #6 \q_stop
+  \cs_set_protected:Npn \@@_data_auxv:nnnnw #1#2#3#4#5 Last> #6 \q_stop
     {
-      \exp_not:N \tl_if_blank:nTF {#6}
+      \tl_if_blank:nTF {#6}
         {
-          \exp_not:N \@@_range:nnn {#1} { category }
-            { \exp_not:V \l_@@_category_Cn_tl }
-          \exp_not:N \@@_range:nnn {#1} { uppercase } { 0 }
-          \exp_not:N \@@_range:nnn {#1} { lowercase } { 0 }
+          \@@_range:nno {"#1} { category }
+            \l_@@_category_default_tl
+          \@@_range:nnn {"#1} { uppercase } { 0 }
+          \@@_range:nnn {"#1} { lowercase } { 0 }
         }
         {
-          \exp_not:N \@@_range:nnn {#1} { category } {#2}
-          \exp_not:N \@@_range:nnn {#1} { uppercase } {#3}
-          \exp_not:N \@@_range:nnn {#1} { lowercase } {#4}
+          \@@_range:nnn {"#1} { category } {#2}
+          \@@_range:nnn {"#1} { uppercase } {#3}
+          \@@_range:nnn {"#1} { lowercase } {#4}
         }      
+    }
+%    \end{macrocode}
+%  Recover and process grapheme data.
+%    \begin{macrocode}
+  \cs_set_protected:Npn \@@_data_auxvi:nn #1#2
+    {
+      \cs_if_exist:cT
+        { l_@@_ #1 _ \tex_romannumeral:D #2 _tl }
+        {
+          \exp_after:wN \exp_after:wN \exp_after:wN \@@_data_property:nnnn
+            \cs:w
+              l_@@_ #1 _ \tex_romannumeral:D #2 _tl
+                \cs_end: {#2} {#1}
+        }
     }
 %    \end{macrocode}
 %  Calculated the length of the range and the space remaining in the current
 %  block.
 %    \begin{macrocode}
-  \cs_set_protected:Npn \@@_range:nnn #1
+  \cs_set_protected:Npn \@@_range:nnn #1#2
     {
       \exp_args:Nf \@@_range_aux:nnn
-        { \int_eval:n { "#1 - \l_@@_next_codepoint_fint_tl } }
+        { \int_eval:n { #1 - \use:c { l_@@_ #2 _next_tl } } }
+        {#2}
     }
+  \cs_set_protected:Npn \@@_range:nno { \exp_args:Nnno \@@_range:nnn }
+  \cs_set_protected:Npn \@@_range:nnv { \exp_args:Nnnv \@@_range:nnn }
   \cs_set_protected:Npn \@@_range_aux:nnn #1#2
     {
       \exp_args:Nf \@@_range:nnnn
@@ -666,7 +786,7 @@
 %   single codepoint, so the middle step is optimised.
 %    \begin{macrocode}
   \cs_set_protected:Npn \@@_range:nnnn #1#2#3#4
-    {
+    {  
       \prg_replicate:nn {#1}
         { \clist_put_right:cn { l_@@_ #3 _block_clist } {#4} }
     \int_compare:nNnT { \clist_count:c { l_@@_ #3 _block_clist } }
@@ -730,7 +850,7 @@
               \l_@@_matched_block_tl
           }
         \tl_set:ce { l_@@_ #1 _pos_tl }
-          { \int_eval:n { \tl_use:c { l_@@_ #1 _pos_tl } + #2 } } 
+          { \int_eval:n { \tl_use:c { l_@@_ #1 _pos_tl } + #2 } }
       \clist_clear:c { l_@@_ #1 _block_clist }
     }
 %    \end{macrocode}
@@ -738,15 +858,16 @@
 % of the block comma-lists into one large second-stage table with offsets.
 % As we use an index not an offset, there is a little back-and-forward to do.
 %    \begin{macrocode}
-  \cs_set_protected:Npn \@@_finalise_blocks:
+  \cs_set_protected:Npn \@@_finalise_blocks:n #1
     {
-      \clist_map_inline:nn { category , uppercase , lowercase }
+      \clist_map_inline:nn {#1}
         {
-          \@@_range:nnn { 110000 } {##1} { 0 }
-          \@@_finalise_blocks:n {##1}
+          \exp_args:Nnnv \@@_range:nnn { "110000 } {##1}
+            { l_@@_ ##1 _default_tl }
+          \@@_finalise_blocks_aux:n {##1}
         }
     }
-  \cs_set_protected:Npn \@@_finalise_blocks:n #1
+  \cs_set_protected:Npn \@@_finalise_blocks_aux:n #1
     {
       \cs_gset_eq:cc { c_@@_ #1 _index_intarray } { g_@@_ #1 _index_intarray }
       \cs_undefine:c { g_@@_ #1 _index_intarray }
@@ -783,17 +904,22 @@
 %  a token list with spaces retained.
 %    \begin{macrocode}
   \ior_open:Nn \g_@@_data_ior { UnicodeData.txt }
-  \group_begin:
-    \char_set_catcode_space:n { `\  }%
-    \ior_map_variable:NNn \g_@@_data_ior \l_@@_tmpa_tl
-      {%
-        \if_meaning:w \l_@@_tmpa_tl \c_space_tl
-          \exp_after:wN \ior_map_break:
-        \fi:
-        \exp_after:wN \@@_data_auxi:w \l_@@_tmpa_tl \q_stop
-      }%
-    \@@_finalise_blocks:
-  \group_end:
+  \char_set_catcode_space:n { `\  }%
+  \ior_map_variable:NNn \g_@@_data_ior \l_@@_tmpa_tl
+    {%
+      \if_meaning:w \l_@@_tmpa_tl \c_space_tl
+        \exp_after:wN \ior_map_break:
+      \fi:
+      \exp_after:wN \@@_data_auxi:w \l_@@_tmpa_tl \q_stop
+    }%
+  \char_set_catcode_ignore:n { `\  }%
+%    \end{macrocode}
+%  Blocks need to be finalised once they have been read as this relies on
+%  knowing the last real codepoint. So the tables for |UnicodeData.txt|
+%  are closed out before reading additional files.
+%    \begin{macrocode}
+  \@@_finalise_blocks:n
+    { category , grapheme , lowercase , uppercase , wordbreak }
 \group_end:
 %    \end{macrocode}
 %
@@ -961,6 +1087,35 @@
 % \end{macro}
 % \end{macro}
 %
+% \begin{macro}[EXP]
+%   {
+%     \__kernel_codepoint_to_grapheme_class:n,
+%     \__kernel_codepoint_to_wordbreak_class:n
+%   }
+%   Get the value and convert back to the string: not currently
+%   public but otherwise very similar to \cs{codepoint_to_category:n}.
+%    \begin{macrocode}
+\cs_new:Npn \__kernel_codepoint_to_grapheme_class:n #1
+  {
+    \cs:w
+      c_@@_grapheme_
+      \tex_romannumeral:D 
+        \__kernel_codepoint_data:nn { grapheme } {#1}
+      _str
+    \cs_end:
+  }
+\cs_new:Npn \__kernel_codepoint_to_wordbreak_class:n #1
+  {
+    \cs:w
+      c_@@_wordbreak_
+      \tex_romannumeral:D 
+        \__kernel_codepoint_data:nn { wordbreak } {#1}
+      _str
+    \cs_end:
+  }
+%    \end{macrocode}
+% \end{macro}
+%
 % \begin{macro}[EXP]{\@@_nfd:n}
 % \begin{macro}[EXP]{\@@_nfd:nn}
 %   A simple interface.
@@ -976,54 +1131,6 @@
 %    \end{macrocode}
 % \end{macro}
 % \end{macro}
-%
-%    \begin{macrocode}
-%<@@=text>
-%    \end{macrocode}
-%
-%  Read the Unicode grapheme data. This is quite easy to handle and we only need
-%  codepoints, not characters, so there is no need to worry about the engine in use.
-%  As reading as a string is most convenient, we have to do some work to remove
-%  spaces: the hardest part of the entire process!
-%    \begin{macrocode}
-\ior_new:N \g_@@_data_ior
-\group_begin:
-  \ior_open:Nn \g_@@_data_ior { GraphemeBreakProperty.txt }
-  \cs_set_nopar:Npn \l_@@_tmpa_str { }
-  \cs_set_nopar:Npn \l_@@_tmpb_str { }
-  \cs_set_protected:Npn \@@_data_auxi:w #1 ;~ #2 ~ #3 \q_stop
-    {
-      \str_if_eq:VnF \l_@@_tmpb_str {#2}
-        {
-          \str_if_empty:NF \l_@@_tmpb_str
-            {
-              \clist_const:ce { c_@@_grapheme_ \l_@@_tmpb_str _clist }
-                { \exp_after:wN \use_none:n \l_@@_tmpa_str }
-              \cs_set_nopar:Npn \l_@@_tmpa_str { }
-            }
-          \cs_set_nopar:Npn \l_@@_tmpb_str {#2}
-        }
-      \@@_data_auxii:w #1 .. #1 .. #1 \q_stop
-    }
-  \cs_set_protected:Npn \@@_data_auxii:w #1 .. #2 .. #3 \q_stop
-    {
-      \cs_set_nopar:Npe \l_@@_tmpa_str
-        {
-          \l_@@_tmpa_str ,
-          \tl_trim_spaces:n {#1} .. \tl_trim_spaces:n {#2}
-        }
-    }
-  \ior_str_map_inline:Nn \g_@@_data_ior
-    {
-      \str_if_eq:eeF { \tl_head:w #1 \c_hash_str \q_stop } { \c_hash_str }
-        {
-          \tl_if_blank:nF {#1}
-            { \@@_data_auxi:w #1 \q_stop }
-        }
-    }
-  \ior_close:N \g_@@_data_ior
-\group_end:    
-%    \end{macrocode}
 %
 %    \begin{macrocode}
 %</package>
